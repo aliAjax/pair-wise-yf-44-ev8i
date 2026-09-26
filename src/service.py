@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 from .audit import AuditTrail
-from .domain import ConflictError, NotFoundError
+from .domain import ConflictError, DomainError, NotFoundError
 from .rules import RuleEngine
 
 
@@ -56,7 +56,30 @@ class DomainService:
             updated["status"],
             {"patch": patch},
         )
+        if entity["kind"] == "unit" and updated["status"] in ("shutdown", "frozen"):
+            self._invalidate_affected_changes(actor, updated)
         return updated
+
+    def _invalidate_affected_changes(self, actor, unit):
+        for change in self.repository.list_entities(kind="change"):
+            if change["status"] not in ("approved", "implemented"):
+                continue
+            scope = change["data"].get("impacted_units") or []
+            hit = any(
+                isinstance(entry, dict) and entry.get("unit_id") == unit["id"]
+                for entry in scope
+            )
+            if not hit:
+                continue
+            try:
+                self.transition(
+                    actor,
+                    change["id"],
+                    "invalidate_review",
+                    {"unit_id": unit["id"], "unit_status": unit["status"]},
+                )
+            except DomainError:
+                continue
 
     def get(self, entity_id):
         entity = self.repository.get_entity(entity_id)

@@ -25,6 +25,15 @@ python3 app.py --db ./data.db --port 8310
 ## 核心对象
 
 - `unit`：装置运行状态；`change`：变更申请；`action_item`：风险控制行动项。
+- `change.data.impacted_units`：建单时登记的影响装置清单，含每台装置当时的运行状态快照。
+
+## 影响范围与评审作废
+
+- 建单必须选择受影响装置（`impacted_units`），系统记录每台装置当时的运行状态作为评审基准；旧字段`unit_id`会自动折算为单台影响装置。
+- 批准时逐台核对装置当前状态与登记快照，不一致则拒绝并写明是哪台。
+- 评审通过（approved/implemented）后，影响装置被停机或冻结，变更自动退回待评审（assessed），并记录是哪台装置、什么原因。
+- 中途用`update_scope`增删影响装置，或用`assess`调高风险等级，原评审同样作废；作废后即使行动项全部核验，也必须重新批准、实施后才能投产。
+- 作废原因写入`change.data.review_invalidated`并追加到`invalidations`历史，页面上可直接看到被拦下的原因。
 
 ## 主要接口
 

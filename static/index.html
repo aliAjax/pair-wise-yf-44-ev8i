@@ -5,30 +5,332 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>化工装置变更与工艺安全管理</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 2rem; color: #1f2937; }
-    main { max-width: 820px; margin: auto; }
-    pre { background: #f3f4f6; padding: 1rem; border-radius: 8px; overflow-x: auto; }
-    button { padding: .5rem .8rem; cursor: pointer; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; background: #f1f5f9; color: #1f2937; }
+    header { background: #0f766e; color: #fff; padding: .9rem 1.2rem; display: flex; flex-wrap: wrap; gap: .8rem; align-items: center; }
+    header h1 { font-size: 1.1rem; margin: 0; flex: 1 1 auto; }
+    header label { font-size: .85rem; display: flex; gap: .3rem; align-items: center; }
+    header input, header select { padding: .3rem .4rem; border-radius: 6px; border: none; }
+    main { max-width: 1080px; margin: 1.2rem auto; padding: 0 1rem; display: grid; gap: 1rem; }
+    section { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem 1.2rem; }
+    h2 { font-size: 1rem; margin: 0 0 .8rem; }
+    h3 { font-size: .88rem; margin: .8rem 0 .4rem; color: #475569; }
+    table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+    th, td { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    th { color: #64748b; font-weight: 600; }
+    button { padding: .35rem .7rem; cursor: pointer; border: 1px solid #cbd5e1; background: #fff; border-radius: 6px; font-size: .82rem; }
+    button:hover { background: #f1f5f9; }
+    button.primary { background: #0f766e; border-color: #0f766e; color: #fff; }
+    input, select, textarea { padding: .35rem .5rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: .86rem; }
+    textarea { width: 100%; min-height: 3rem; }
+    .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+    .badge { display: inline-block; padding: .1rem .55rem; border-radius: 999px; font-size: .75rem; background: #e2e8f0; }
+    .badge.operating, .badge.commissioned, .badge.verified { background: #dcfce7; color: #166534; }
+    .badge.shutdown, .badge.rolled_back { background: #fee2e2; color: #991b1b; }
+    .badge.frozen, .badge.assessed, .badge.completed { background: #dbeafe; color: #1e40af; }
+    .badge.approved { background: #fef9c3; color: #854d0e; }
+    .badge.implemented { background: #ffedd5; color: #9a3412; }
+    .muted { color: #64748b; font-size: .8rem; }
+    .warn { color: #b91c1c; font-weight: 600; }
+    .alert { padding: .6rem .8rem; border-radius: 8px; font-size: .88rem; display: none; }
+    .alert.error { display: block; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
+    .alert.ok { display: block; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+    .invalid-banner { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; border-radius: 8px; padding: .5rem .7rem; margin: .5rem 0; font-size: .85rem; }
+    .change-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: .8rem; margin-bottom: .8rem; }
+    .unit-check { display: inline-flex; gap: .3rem; align-items: center; border: 1px solid #e2e8f0; border-radius: 6px; padding: .25rem .5rem; margin: .15rem; font-size: .85rem; }
+    .actions { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .5rem; }
+    .scope-editor { background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: .6rem; margin-top: .5rem; display: none; }
   </style>
 </head>
 <body>
-<main>
+<header>
   <h1>化工装置变更与工艺安全管理</h1>
-  <p>这是最小演示页面。使用浏览器或 curl 调用 JSON API。</p>
-  <p><button onclick="checkHealth()">检查服务状态</button></p>
-  <pre id="result">等待操作</pre>
-  <h2>常用接口</h2>
-  <pre>GET  /health
-GET  /api/&lt;kind&gt;
-POST /api/&lt;kind&gt;
-GET  /api/entities/&lt;id&gt;
-POST /api/entities/&lt;id&gt;/actions</pre>
+  <label>用户 <input id="userId" value="admin" size="8"></label>
+  <label>角色
+    <select id="role">
+      <option>admin</option><option>engineer</option><option>safety</option>
+      <option>operator</option><option>verifier</option><option>viewer</option>
+    </select>
+  </label>
+  <button onclick="refresh()">刷新</button>
+</header>
+<main>
+  <div id="alert" class="alert"></div>
+
+  <section>
+    <h2>装置</h2>
+    <div class="row">
+      <input id="unitName" placeholder="装置名称" size="12">
+      <input id="unitLocation" placeholder="位置" size="10">
+      <button class="primary" onclick="createUnit()">新建装置</button>
+    </div>
+    <table id="unitTable">
+      <thead><tr><th>名称</th><th>位置</th><th>当前状态</th><th>操作</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>新建变更单（登记影响装置）</h2>
+    <p class="muted">建单时必须勾选受影响的装置，系统会记录每台装置当时的运行状态，作为后续评审的基准。</p>
+    <textarea id="changeDesc" placeholder="变更描述"></textarea>
+    <h3>受影响装置</h3>
+    <div id="unitChecks" class="row"></div>
+    <div class="actions"><button class="primary" onclick="createChange()">创建变更单</button></div>
+  </section>
+
+  <section>
+    <h2>变更单列表</h2>
+    <div id="changeList"></div>
+  </section>
 </main>
 <script>
-async function checkHealth() {
-  const response = await fetch('/health');
-  document.getElementById('result').textContent = JSON.stringify(await response.json(), null, 2);
+const STATUS_LABELS = {
+  operating: '运行', shutdown: '已停机', frozen: '已冻结',
+  draft: '草稿', assessed: '待评审', approved: '已批准', implemented: '已实施',
+  commissioned: '已投产', rolled_back: '已回退', closed: '已关闭',
+  open: '待处理', completed: '已完成', verified: '已核验'
+};
+let units = [], changes = [], actionItems = [];
+
+function label(status) { return STATUS_LABELS[status] || status; }
+function badge(status) { return '<span class="badge ' + status + '">' + label(status) + '</span>'; }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g,
+    c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 }
+function headers() {
+  return {
+    'Content-Type': 'application/json',
+    'X-User-Id': document.getElementById('userId').value || 'anonymous',
+    'X-Role': document.getElementById('role').value
+  };
+}
+async function api(path, options = {}) {
+  const resp = await fetch(path, Object.assign({}, options, {headers: headers()}));
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(body.error || ('HTTP ' + resp.status));
+  return body;
+}
+function show(message, isError) {
+  const el = document.getElementById('alert');
+  el.textContent = message;
+  el.className = 'alert ' + (isError ? 'error' : 'ok');
+}
+async function run(fn) {
+  try { await fn(); } catch (err) { show(err.message, true); }
+}
+async function refresh() {
+  try {
+    units = (await api('/api/units')).items;
+    changes = (await api('/api/changes')).items;
+    actionItems = (await api('/api/action_items')).items;
+    render();
+  } catch (err) { show(err.message, true); }
+}
+
+async function createUnit() {
+  await run(async () => {
+    const name = document.getElementById('unitName').value.trim();
+    const location = document.getElementById('unitLocation').value.trim();
+    await api('/api/units', {method: 'POST', body: JSON.stringify({name, location})});
+    show('装置已创建');
+    await refresh();
+  });
+}
+async function unitAction(id, action) {
+  let data = {};
+  if (action === 'shutdown' || action === 'freeze') {
+    const reason = prompt('请输入原因（' + label(action === 'shutdown' ? 'shutdown' : 'frozen') + '）');
+    if (reason === null) return;
+    data = {reason};
+  }
+  await run(async () => {
+    await api('/api/entities/' + id + '/actions', {method: 'POST', body: JSON.stringify({action, data})});
+    show('装置操作完成；若有已批准变更涉及该装置，已自动退回待评审');
+    await refresh();
+  });
+}
+async function createChange() {
+  await run(async () => {
+    const description = document.getElementById('changeDesc').value.trim();
+    const impacted = [...document.querySelectorAll('#unitChecks input:checked')].map(c => c.value);
+    await api('/api/changes', {method: 'POST', body: JSON.stringify({description, impacted_units: impacted})});
+    show('变更单已创建，登记影响装置 ' + impacted.length + ' 台');
+    document.getElementById('changeDesc').value = '';
+    await refresh();
+  });
+}
+async function changeAction(id, action, data) {
+  await run(async () => {
+    await api('/api/entities/' + id + '/actions', {method: 'POST', body: JSON.stringify({action, data})});
+    show('操作完成');
+    await refresh();
+  });
+}
+async function assess(id) {
+  const risk = prompt('风险等级 (low/medium/high/critical)', 'medium');
+  if (!risk) return;
+  const analyst = prompt('评估人', document.getElementById('userId').value);
+  if (analyst === null) return;
+  await changeAction(id, 'assess', {risk_level: risk, analyst});
+}
+async function approve(id) {
+  const approvals = prompt('批准人（逗号分隔）', 'S-1,S-2');
+  if (!approvals) return;
+  const permit = prompt('许可证号', 'MOC-1');
+  if (permit === null) return;
+  await changeAction(id, 'approve', {
+    approvals: approvals.split(',').map(s => s.trim()).filter(Boolean),
+    permit_id: permit
+  });
+}
+async function implement(id) {
+  const version = prompt('规程版本', 'v1');
+  if (version === null) return;
+  await changeAction(id, 'implement', {procedure_version: version});
+}
+async function commission(id) { await changeAction(id, 'commission', {tests_passed: true}); }
+async function rollbackChange(id) {
+  const reason = prompt('回退原因');
+  if (reason === null) return;
+  await changeAction(id, 'rollback', {reason});
+}
+async function closeChange(id) {
+  const outcome = prompt('关闭结论');
+  if (outcome === null) return;
+  await changeAction(id, 'close', {outcome});
+}
+function toggleScopeEditor(id) {
+  const el = document.getElementById('scope-' + id);
+  el.style.display = el.style.display === 'block' ? 'none' : 'block';
+}
+async function submitScope(id) {
+  const boxes = document.querySelectorAll('#scope-' + id + ' input[type=checkbox]');
+  const impacted = [...boxes].filter(b => b.checked).map(b => b.value);
+  await changeAction(id, 'update_scope', {impacted_units: impacted});
+}
+async function addItem(changeId) {
+  const description = document.getElementById('ai-desc-' + changeId).value.trim();
+  const owner = document.getElementById('ai-owner-' + changeId).value.trim();
+  await run(async () => {
+    await api('/api/action_items', {method: 'POST', body: JSON.stringify({change_id: changeId, description, owner})});
+    show('行动项已添加');
+    await refresh();
+  });
+}
+async function completeItem(id) {
+  const completed_by = prompt('完成人', document.getElementById('userId').value);
+  if (completed_by === null) return;
+  const evidence = prompt('证明材料', 'record-1');
+  if (evidence === null) return;
+  await changeAction(id, 'complete', {completed_by, evidence});
+}
+async function verifyItem(id) {
+  const verifier = prompt('核验人', document.getElementById('userId').value);
+  if (verifier === null) return;
+  await changeAction(id, 'verify', {verifier});
+}
+async function reopenItem(id) {
+  const reason = prompt('重开原因');
+  if (reason === null) return;
+  await changeAction(id, 'reopen', {reason});
+}
+
+function unitActions(u) {
+  const btns = [];
+  if (u.status === 'operating') {
+    btns.push('<button onclick="unitAction(\'' + u.id + '\',\'shutdown\')">停机</button>');
+    btns.push('<button onclick="unitAction(\'' + u.id + '\',\'freeze\')">冻结</button>');
+  }
+  if (u.status === 'shutdown') btns.push('<button onclick="unitAction(\'' + u.id + '\',\'startup\')">开机</button>');
+  if (u.status === 'frozen') btns.push('<button onclick="unitAction(\'' + u.id + '\',\'unfreeze\')">解冻</button>');
+  return btns.join(' ');
+}
+function changeActions(c) {
+  const b = [];
+  const st = c.status;
+  if (['draft', 'assessed'].includes(st)) b.push('<button onclick="assess(\'' + c.id + '\')">评估风险</button>');
+  if (['approved', 'implemented'].includes(st)) b.push('<button onclick="assess(\'' + c.id + '\')">重新评估</button>');
+  if (st === 'assessed') b.push('<button onclick="approve(\'' + c.id + '\')">批准</button>');
+  if (st === 'approved') b.push('<button onclick="implement(\'' + c.id + '\')">实施</button>');
+  if (st === 'implemented') b.push('<button onclick="commission(\'' + c.id + '\')">投产</button>');
+  if (['implemented', 'commissioned'].includes(st)) b.push('<button onclick="rollbackChange(\'' + c.id + '\')">回退</button>');
+  if (st === 'rolled_back') b.push('<button onclick="closeChange(\'' + c.id + '\')">关闭</button>');
+  if (['draft', 'assessed', 'approved', 'implemented'].includes(st)) {
+    b.push('<button onclick="toggleScopeEditor(\'' + c.id + '\')">调整影响装置</button>');
+  }
+  return b.join('');
+}
+function itemActions(i) {
+  if (i.status === 'open') return '<button onclick="completeItem(\'' + i.id + '\')">完成</button>';
+  if (i.status === 'completed') return '<button onclick="verifyItem(\'' + i.id + '\')">核验</button>';
+  if (i.status === 'verified') return '<button onclick="reopenItem(\'' + i.id + '\')">重开</button>';
+  return '';
+}
+function renderChange(c) {
+  const scope = c.data.impacted_units || [];
+  const scopeRows = scope.map(s => {
+    const u = units.find(x => x.id === s.unit_id);
+    const now = u ? u.status : null;
+    const mismatch = now && now !== s.status_at_registration;
+    const nowCell = now
+      ? (mismatch ? '<span class="warn">' + label(now) + '（与登记不一致）</span>' : label(now))
+      : '<span class="warn">未知</span>';
+    return '<tr><td>' + esc(s.unit_name || s.unit_id) + '</td><td>' + label(s.status_at_registration) + '</td><td>' + nowCell + '</td></tr>';
+  }).join('');
+  const inv = c.data.review_invalidated;
+  const banner = inv
+    ? '<div class="invalid-banner">⚠ 评审作废：' + esc(inv.message || '') +
+      (inv.unit_name ? '（装置：' + esc(inv.unit_name) + '）' : '') +
+      '<br><span class="muted">' + esc(inv.by || '') + ' · ' + esc(inv.at || '') + '</span></div>'
+    : '';
+  const history = (c.data.invalidations || []).length;
+  const items = actionItems.filter(i => i.data.change_id === c.id);
+  const itemRows = items.map(i =>
+    '<tr><td>' + esc(i.data.description) + '</td><td>' + esc(i.data.owner || '') + '</td><td>' + badge(i.status) + '</td><td>' + itemActions(i) + '</td></tr>'
+  ).join('');
+  const scopeIds = scope.map(s => s.unit_id);
+  const editor = units.map(u =>
+    '<label class="unit-check"><input type="checkbox" value="' + u.id + '"' +
+    (scopeIds.includes(u.id) ? ' checked' : '') + '>' + esc(u.data.name) +
+    ' <span class="muted">当前:' + label(u.status) + '</span></label>'
+  ).join('');
+  return '<div class="change-card">' +
+    '<div class="row"><strong>' + esc(c.data.description || '(无描述)') + '</strong>' + badge(c.status) +
+    '<span class="muted">#' + c.id.slice(0, 8) + ' · 风险 ' + esc(c.data.risk_level || '-') +
+    ' · 需 ' + (c.data.required_approvals || '-') + ' 人批准' +
+    (history ? ' · 评审作废 ' + history + ' 次' : '') + '</span></div>' +
+    banner +
+    '<h3>影响装置（登记时状态为评审基准）</h3>' +
+    '<table><thead><tr><th>装置</th><th>登记时状态</th><th>当前状态</th></tr></thead><tbody>' + scopeRows + '</tbody></table>' +
+    '<div class="actions">' + changeActions(c) + '</div>' +
+    '<div class="scope-editor" id="scope-' + c.id + '">' +
+      '<div class="muted">重新勾选影响装置；已批准后增删装置或调高风险等级将使原评审作废。</div>' +
+      editor +
+      '<div class="actions"><button class="primary" onclick="submitScope(\'' + c.id + '\')">保存影响范围</button></div>' +
+    '</div>' +
+    '<h3>控制措施 / 行动项（全部核验后才可投产）</h3>' +
+    '<table><thead><tr><th>措施</th><th>负责人</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
+    (itemRows || '<tr><td colspan="4" class="muted">暂无</td></tr>') + '</tbody></table>' +
+    '<div class="row" style="margin-top:.4rem">' +
+      '<input id="ai-desc-' + c.id + '" placeholder="新措施描述" size="20">' +
+      '<input id="ai-owner-' + c.id + '" placeholder="负责人" size="8">' +
+      '<button onclick="addItem(\'' + c.id + '\')">添加</button>' +
+    '</div>' +
+  '</div>';
+}
+function render() {
+  document.querySelector('#unitTable tbody').innerHTML = units.map(u =>
+    '<tr><td>' + esc(u.data.name) + '</td><td>' + esc(u.data.location || '') + '</td><td>' + badge(u.status) + '</td><td>' + unitActions(u) + '</td></tr>'
+  ).join('') || '<tr><td colspan="4" class="muted">暂无装置</td></tr>';
+  document.getElementById('unitChecks').innerHTML = units.map(u =>
+    '<label class="unit-check"><input type="checkbox" value="' + u.id + '">' + esc(u.data.name) +
+    ' <span class="muted">当前:' + label(u.status) + '</span></label>'
+  ).join('') || '<span class="muted">请先创建装置</span>';
+  document.getElementById('changeList').innerHTML = changes.map(renderChange).join('') || '<p class="muted">暂无变更单</p>';
+}
+refresh();
 </script>
 </body>
 </html>
