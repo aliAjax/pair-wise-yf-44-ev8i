@@ -24,7 +24,17 @@ python3 app.py --db ./data.db --port 8310
 
 ## 核心对象
 
-- `unit`：装置运行状态；`change`：变更申请；`action_item`：风险控制行动项。
+- `unit`：装置运行状态（`operating` / `shutdown` / `frozen`）；`change`：变更申请；`action_item`：风险控制行动项。
+
+## 影响范围管控
+
+变更单不再只有一句影响描述：
+
+- 建单时通过 `affected_unit_ids` 选择一台或多台受影响装置（旧字段 `unit_id` 仍兼容），系统把每台装置**当时的运行状态**快照写入 `data.affected_units`（装置名、状态、时间）；不选装置不允许建单。
+- 评审通过后（`approved` / `implemented`），任一受影响装置被 **shutdown/freeze**，变更自动退回 `assessed`（待评审），`data.blocks` 与 `data.void_reason` 写明是哪台装置、停机还是冻结；装置恢复开车/解冻后清除该台的当前拦截记录，但变更仍需重新评审。
+- 停机/冻结期间重新提交评审会被拒绝，`implement` 与 `commission` 同样实时校验装置状态——即使控制措施全部 `verified`，装置不可用就投不了产。
+- `revise` 动作用于中途修订：增删受影响装置或把 `risk_level` 调高，原评审立即作废并退回待评审（自动重算所需评审人数）；仅改描述、仅降级风险或装置清单不变，不影响已通过的评审。
+- 所有自动退回（审计动作 `auto_return`）和拦截清除（`block_cleared`）都写入审计时间线；演示页面上红色拦截条直接展示被拦下的原因，并对比装置快照状态与当前状态。
 
 ## 主要接口
 

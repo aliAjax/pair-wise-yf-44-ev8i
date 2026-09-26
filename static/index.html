@@ -5,30 +5,513 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>化工装置变更与工艺安全管理</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 2rem; color: #1f2937; }
-    main { max-width: 820px; margin: auto; }
-    pre { background: #f3f4f6; padding: 1rem; border-radius: 8px; overflow-x: auto; }
-    button { padding: .5rem .8rem; cursor: pointer; }
+    :root {
+      --danger-bg: #fef2f2; --danger-border: #dc2626; --danger-text: #991b1b;
+      --warn-bg: #fffbeb; --warn-border: #d97706;
+      --ok: #166534; --muted: #6b7280; --line: #e5e7eb;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; margin: 0; color: #1f2937; background: #f9fafb; }
+    header { background: #111827; color: #fff; padding: .8rem 1.5rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    header h1 { font-size: 1.05rem; margin: 0; }
+    header label { font-size: .85rem; }
+    header input, header select { padding: .25rem .4rem; border-radius: 4px; border: 1px solid #4b5563; background: #1f2937; color: #fff; }
+    main { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; }
+    section { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.2rem; margin-bottom: 1.2rem; }
+    h2 { font-size: 1rem; margin: 0 0 .8rem; display: flex; align-items: center; gap: .5rem; }
+    .card { border: 1px solid var(--line); border-radius: 8px; padding: .8rem 1rem; margin-bottom: .7rem; }
+    .card-head { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+    .card-id { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .78rem; color: var(--muted); }
+    .desc { margin: .35rem 0 .5rem; }
+    .badge { display: inline-block; padding: .1rem .55rem; border-radius: 999px; font-size: .75rem; font-weight: 600; background: #e5e7eb; }
+    .badge.operating, .badge.commissioned { background: #dcfce7; color: var(--ok); }
+    .badge.shutdown, .badge.frozen, .badge.draft { background: #fee2e2; color: var(--danger-text); }
+    .badge.frozen { background: #e0e7ff; color: #3730a3; }
+    .badge.assessed { background: #fef3c7; color: #92400e; }
+    .badge.approved { background: #dbeafe; color: #1e40af; }
+    .badge.implemented { background: #ede9fe; color: #5b21b6; }
+    .badge.rolled_back, .badge.closed { background: #f3f4f6; color: var(--muted); }
+    .badge.open { background: #fee2e2; color: var(--danger-text); }
+    .badge.completed { background: #fef3c7; color: #92400e; }
+    .badge.verified { background: #dcfce7; color: var(--ok); }
+    .block-banner { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger-text); border-radius: 8px; padding: .6rem .8rem; margin: .5rem 0; font-size: .88rem; }
+    .block-banner b { display: block; margin-bottom: .2rem; }
+    .block-banner ul { margin: .2rem 0 0; padding-left: 1.1rem; }
+    .void-note { background: var(--warn-bg); border: 1px solid var(--warn-border); color: #78350f; border-radius: 8px; padding: .5rem .8rem; margin: .5rem 0; font-size: .85rem; }
+    table { border-collapse: collapse; width: 100%; font-size: .83rem; margin: .5rem 0; }
+    th, td { border: 1px solid var(--line); padding: .35rem .55rem; text-align: left; }
+    th { background: #f3f4f6; font-weight: 600; }
+    tr.drift td { background: var(--danger-bg); }
+    button { padding: .35rem .7rem; font-size: .8rem; border-radius: 6px; border: 1px solid #9ca3af; background: #fff; cursor: pointer; }
+    button:hover { background: #f3f4f6; }
+    button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+    button.primary:hover { background: #1d4ed8; }
+    button.danger { border-color: var(--danger-border); color: var(--danger-text); }
+    .actions { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .55rem; }
+    .editor { display: none; margin-top: .6rem; padding: .7rem; background: #f9fafb; border: 1px dashed #9ca3af; border-radius: 8px; }
+    .editor.open { display: block; }
+    .editor .row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: .5rem; }
+    input[type=text], input[type=checkbox], select, textarea { font-size: .85rem; }
+    input[type=text], select, textarea { padding: .35rem .5rem; border: 1px solid #9ca3af; border-radius: 6px; }
+    input[type=text], textarea { min-width: 200px; }
+    textarea { width: 100%; min-height: 48px; resize: vertical; }
+    label.check { display: inline-flex; align-items: center; gap: .3rem; margin-right: .8rem; font-size: .85rem; }
+    #toast { position: fixed; right: 1rem; bottom: 1rem; max-width: 420px; display: flex; flex-direction: column; gap: .4rem; z-index: 99; }
+    .toast-item { padding: .55rem .8rem; border-radius: 8px; font-size: .85rem; box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+    .toast-item.ok { background: #dcfce7; color: var(--ok); }
+    .toast-item.err { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger-text); }
+    .muted { color: var(--muted); font-size: .8rem; }
+    .audit-table td { font-size: .78rem; }
+    .meta { font-size: .78rem; color: var(--muted); margin-top: .3rem; }
   </style>
 </head>
 <body>
+<header>
+  <h1>化工装置变更与工艺安全管理（MOC）</h1>
+  <label>用户 <input id="userId" type="text" value="admin" size="10"></label>
+  <label>角色
+    <select id="role">
+      <option value="admin">admin 管理员</option>
+      <option value="engineer">engineer 工程师</option>
+      <option value="safety">safety 安全</option>
+      <option value="operator">operator 操作员</option>
+      <option value="verifier">verifier 核验人</option>
+      <option value="viewer">viewer 只读</option>
+    </select>
+  </label>
+  <button onclick="loadAll()">刷新</button>
+</header>
 <main>
-  <h1>化工装置变更与工艺安全管理</h1>
-  <p>这是最小演示页面。使用浏览器或 curl 调用 JSON API。</p>
-  <p><button onclick="checkHealth()">检查服务状态</button></p>
-  <pre id="result">等待操作</pre>
-  <h2>常用接口</h2>
-  <pre>GET  /health
-GET  /api/&lt;kind&gt;
-POST /api/&lt;kind&gt;
-GET  /api/entities/&lt;id&gt;
-POST /api/entities/&lt;id&gt;/actions</pre>
+
+  <section id="units-section">
+    <h2>装置运行状态</h2>
+    <div id="units"></div>
+    <div class="actions">
+      <button class="primary" onclick="toggleEditor('new-unit')">登记新装置</button>
+    </div>
+    <div class="editor" id="editor-new-unit">
+      <div class="row">
+        <input type="text" id="unit-name" placeholder="装置名称，如 Reactor-1">
+        <input type="text" id="unit-location" placeholder="位置，如 Plant-A">
+        <button class="primary" onclick="createUnit()">创建</button>
+        <button onclick="toggleEditor('new-unit')">取消</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="changes-section">
+    <h2>变更单（影响范围管控）</h2>
+    <div id="changes"></div>
+    <div class="actions">
+      <button class="primary" onclick="toggleEditor('new-change')">新建变更单</button>
+    </div>
+    <div class="editor" id="editor-new-change">
+      <div class="row">
+        <strong>受影响装置（必选，建单时快照运行状态）：</strong>
+      </div>
+      <div class="row" id="new-change-units"></div>
+      <div class="row">
+        <textarea id="change-description" placeholder="变更影响描述"></textarea>
+      </div>
+      <div class="row">
+        <button class="primary" onclick="createChange()">创建变更单</button>
+        <button onclick="toggleEditor('new-change')">取消</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="items-section">
+    <h2>风险控制行动项</h2>
+    <div id="action-items"></div>
+    <div class="actions">
+      <button class="primary" onclick="toggleEditor('new-item')">登记行动项</button>
+    </div>
+    <div class="editor" id="editor-new-item">
+      <div class="row">
+        <select id="item-change"></select>
+        <input type="text" id="item-description" placeholder="控制措施描述">
+        <input type="text" id="item-owner" placeholder="责任人">
+        <button class="primary" onclick="createActionItem()">创建</button>
+        <button onclick="toggleEditor('new-item')">取消</button>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>审计时间线</h2>
+    <div style="max-height:360px; overflow:auto;">
+      <table class="audit-table">
+        <thead><tr><th>时间(UTC)</th><th>实体</th><th>动作</th><th>状态</th><th>操作人</th><th>详情</th></tr></thead>
+        <tbody id="audit-body"></tbody>
+      </table>
+    </div>
+  </section>
 </main>
+<div id="toast"></div>
+
 <script>
-async function checkHealth() {
-  const response = await fetch('/health');
-  document.getElementById('result').textContent = JSON.stringify(await response.json(), null, 2);
+const STATUS_LABEL = {
+  operating: '运行中', shutdown: '停机', frozen: '冻结',
+  draft: '草稿', assessed: '待评审', approved: '已评审',
+  implemented: '已实施', commissioned: '已投产',
+  rolled_back: '已回退', closed: '已关闭',
+  open: '待处理', completed: '已完成', verified: '已核验'
+};
+const RISK_LABEL = { low: '低', medium: '中', high: '高', critical: '极高' };
+let state = { units: [], changes: [], items: [], audit: [] };
+
+function headers() {
+  return {
+    'Content-Type': 'application/json',
+    'X-User-Id': document.getElementById('userId').value || 'anonymous',
+    'X-Role': document.getElementById('role').value
+  };
 }
+
+function toast(message, ok) {
+  const box = document.getElementById('toast');
+  const item = document.createElement('div');
+  item.className = 'toast-item ' + (ok ? 'ok' : 'err');
+  item.textContent = message;
+  box.appendChild(item);
+  setTimeout(() => item.remove(), 6000);
+}
+
+function toggleEditor(name) {
+  document.getElementById('editor-' + name).classList.toggle('open');
+  if (name === 'new-change' && document.getElementById('editor-new-change').classList.contains('open')) {
+    renderChangeUnitPicker();
+  }
+  if (name === 'new-item' && document.getElementById('editor-new-item').classList.contains('open')) {
+    renderItemChangePicker();
+  }
+}
+
+async function api(method, path, body) {
+  const response = await fetch(path, {
+    method,
+    headers: headers(),
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((payload.type ? '[' + payload.type + '] ' : '') + (payload.error || response.status));
+  }
+  return payload;
+}
+
+async function act(entityId, action, data, expectedVersion) {
+  try {
+    await api('POST', '/api/entities/' + encodeURIComponent(entityId) + '/actions', {
+      action, data: data || {}, expected_version: expectedVersion
+    });
+    toast('动作 ' + action + ' 已执行', true);
+    await loadAll();
+  } catch (error) {
+    toast('动作被拦下：' + error.message, false);
+  }
+}
+
+async function loadAll() {
+  const [units, changes, items, audit] = await Promise.all([
+    api('GET', '/api/units'),
+    api('GET', '/api/changes'),
+    api('GET', '/api/action_items'),
+    api('GET', '/api/audit')
+  ]);
+  state = { units: units.items, changes: changes.items, items: items.items, audit: audit.items };
+  renderUnits();
+  renderChanges();
+  renderActionItems();
+  renderAudit();
+}
+
+function badge(status) {
+  const label = STATUS_LABEL[status] || status;
+  return '<span class="badge ' + status + '">' + label + '</span>';
+}
+
+function findUnit(id) {
+  return state.units.find(unit => unit.id === id);
+}
+
+function renderUnits() {
+  const host = document.getElementById('units');
+  if (!state.units.length) {
+    host.innerHTML = '<p class="muted">还没有装置，先登记。</p>';
+    return;
+  }
+  host.innerHTML = state.units.map(unit => {
+    const data = unit.data || {};
+    let buttons = '';
+    if (unit.status === 'operating') {
+      buttons = '<button class="danger" onclick="unitAction(\'' + unit.id + '\',\'shutdown\',' + unit.version + ')">停机</button>'
+        + '<button class="danger" onclick="unitAction(\'' + unit.id + '\',\'freeze\',' + unit.version + ')">冻结</button>';
+    } else if (unit.status === 'shutdown') {
+      buttons = '<button onclick="unitAction(\'' + unit.id + '\',\'startup\',' + unit.version + ')">开车</button>';
+    } else if (unit.status === 'frozen') {
+      buttons = '<button onclick="unitAction(\'' + unit.id + '\',\'unfreeze\',' + unit.version + ')">解冻</button>';
+    }
+    return '<div class="card"><div class="card-head">' + badge(unit.status)
+      + '<strong>' + esc(data.name || unit.id) + '</strong>'
+      + '<span class="card-id">' + unit.id + '</span>'
+      + '<span class="muted">' + esc(data.location || '') + '</span></div>'
+      + '<div class="actions">' + buttons + '</div></div>';
+  }).join('');
+}
+
+async function unitAction(id, action, version) {
+  const reason = prompt(action === 'shutdown' ? '停机原因' : action === 'freeze' ? '冻结原因' : '恢复说明');
+  if (reason === null) return;
+  await act(id, action, { reason: reason || 'n/a' }, version);
+}
+
+function renderChangeUnitPicker() {
+  const host = document.getElementById('new-change-units');
+  if (!state.units.length) {
+    host.innerHTML = '<span class="muted">请先登记装置。</span>';
+    return;
+  }
+  host.innerHTML = state.units.map(unit =>
+    '<label class="check"><input type="checkbox" name="pick-unit" value="' + unit.id + '">'
+    + esc(unit.data.name || unit.id) + ' <span class="muted">(' + (STATUS_LABEL[unit.status] || unit.status) + ')</span></label>'
+  ).join('');
+}
+
+function renderItemChangePicker() {
+  const select = document.getElementById('item-change');
+  select.innerHTML = state.changes.map(change =>
+    '<option value="' + change.id + '">' + (change.data.description || change.id) + '</option>'
+  ).join('');
+}
+
+function esc(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, ch =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+function blockedBanner(change) {
+  const blocks = change.data.blocks || [];
+  if (!blocks.length) return '';
+  return '<div class="block-banner"><b>⛔ 该变更被拦下，已退回待评审：</b><ul>'
+    + blocks.map(block => '<li>' + esc(block.message || (block.unit_id + ' ' + block.code)) + '</li>').join('')
+    + '</ul></div>';
+}
+
+function voidNote(change) {
+  const voidReason = change.data.void_reason;
+  if (!voidReason || (change.data.blocks || []).length) return '';
+  return '<div class="void-note">⚠ ' + esc(voidReason.message || '原评审已作废')
+    + '<span class="muted">（' + esc(voidReason.at || '') + '）</span></div>';
+}
+
+function affectedUnitsTable(change) {
+  const snapshots = change.data.affected_units || [];
+  if (!snapshots.length) return '';
+  const rows = snapshots.map(snap => {
+    const unit = findUnit(snap.unit_id);
+    const current = unit ? unit.status : 'missing';
+    const drift = unit && unit.status !== snap.status;
+    return '<tr class="' + (drift ? 'drift' : '') + '">'
+      + '<td>' + esc(snap.unit_name) + '</td>'
+      + '<td class="card-id">' + esc(snap.unit_id) + '</td>'
+      + '<td>' + (STATUS_LABEL[snap.status] || snap.status) + '</td>'
+      + '<td>' + (STATUS_LABEL[current] || current) + (drift ? ' ⚠ 已变化' : '') + '</td>'
+      + '<td class="muted">' + esc(snap.captured_at || '') + '</td></tr>';
+  }).join('');
+  return '<table><thead><tr><th>受影响装置</th><th>ID</th><th>建单时状态</th><th>当前状态</th><th>快照时间</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table>';
+}
+
+function changeActions(change) {
+  const id = change.id;
+  const v = change.version;
+  let buttons = [];
+  if (change.status === 'draft') {
+    buttons.push('<button class="primary" onclick="assess(\'' + id + '\',' + v + ')">风险评估</button>');
+  } else if (change.status === 'assessed') {
+    buttons.push('<button class="primary" onclick="approve(\'' + id + '\',' + v + ')">提交评审</button>');
+  } else if (change.status === 'approved') {
+    buttons.push('<button class="primary" onclick="implement(\'' + id + '\',' + v + ')">实施</button>');
+  } else if (change.status === 'implemented') {
+    buttons.push('<button class="primary" onclick="commission(\'' + id + '\',' + v + ')">投产</button>');
+    buttons.push('<button class="danger" onclick="rollback(\'' + id + '\',' + v + ')">回退</button>');
+  } else if (change.status === 'commissioned') {
+    buttons.push('<button class="danger" onclick="rollback(\'' + id + '\',' + v + ')">回退</button>');
+  } else if (change.status === 'rolled_back') {
+    buttons.push('<button onclick="closeChange(\'' + id + '\',' + v + ')">关闭</button>');
+  }
+  if (['draft', 'assessed', 'approved', 'implemented'].includes(change.status)) {
+    buttons.push('<button onclick="revise(\'' + id + '\',' + v + ')">变更影响范围/风险（revise）</button>');
+  }
+  return '<div class="actions">' + buttons.join('') + '</div>';
+}
+
+function renderChanges() {
+  const host = document.getElementById('changes');
+  if (!state.changes.length) {
+    host.innerHTML = '<p class="muted">还没有变更单。</p>';
+    return;
+  }
+  host.innerHTML = state.changes.map(change => {
+    const risk = change.data.risk_level;
+    return '<div class="card">'
+      + '<div class="card-head">' + badge(change.status)
+      + (risk ? '<span class="badge">风险：' + (RISK_LABEL[risk] || risk) + '（需' + (change.data.required_approvals || '?') + '人评审）</span>' : '')
+      + '<span class="card-id">' + change.id + '</span></div>'
+      + '<div class="desc">' + esc(change.data.description || '') + '</div>'
+      + blockedBanner(change) + voidNote(change)
+      + affectedUnitsTable(change)
+      + changeActions(change)
+      + '<div class="meta">创建人 ' + esc(change.created_by) + ' · 更新于 ' + esc(change.updated_at) + ' · version ' + change.version + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+async function createUnit() {
+  const name = document.getElementById('unit-name').value.trim();
+  const location = document.getElementById('unit-location').value.trim();
+  if (!name || !location) { toast('装置名称和位置必填', false); return; }
+  try {
+    await api('POST', '/api/units', { name, location });
+    document.getElementById('unit-name').value = '';
+    document.getElementById('unit-location').value = '';
+    toggleEditor('new-unit');
+    toast('装置已登记', true);
+    await loadAll();
+  } catch (error) { toast('创建失败：' + error.message, false); }
+}
+
+async function createChange() {
+  const ids = Array.from(document.querySelectorAll('#new-change-units input:checked')).map(input => input.value);
+  const description = document.getElementById('change-description').value.trim();
+  if (!ids.length) { toast('至少选择一台受影响装置', false); return; }
+  if (!description) { toast('影响描述必填', false); return; }
+  try {
+    await api('POST', '/api/changes', { affected_unit_ids: ids, description });
+    document.getElementById('change-description').value = '';
+    toggleEditor('new-change');
+    toast('变更单已创建，已记录各装置建单时运行状态', true);
+    await loadAll();
+  } catch (error) { toast('创建失败：' + error.message, false); }
+}
+
+async function assess(id, version) {
+  const risk = prompt('风险等级：low / medium / high / critical', 'medium');
+  if (!risk) return;
+  const analyst = document.getElementById('userId').value;
+  await act(id, 'assess', { risk_level: risk.trim(), analyst }, version);
+}
+
+async function approve(id, version) {
+  const permit = prompt('作业许可编号 permit_id');
+  if (!permit) return;
+  const approvals = prompt('评审人（逗号分隔，人数需满足风险等级要求）', 'S-1,S-2');
+  if (!approvals) return;
+  await act(id, 'approve', { permit_id: permit, approvals: approvals.split(',').map(s => s.trim()).filter(Boolean) }, version);
+}
+
+async function implement(id, version) {
+  const procedure = prompt('作业方案版本 procedure_version', 'v1');
+  if (!procedure) return;
+  await act(id, 'implement', { procedure_version: procedure }, version);
+}
+
+async function commission(id, version) {
+  await act(id, 'commission', { tests_passed: true }, version);
+}
+
+async function rollback(id, version) {
+  const reason = prompt('回退原因');
+  if (reason === null) return;
+  await act(id, 'rollback', { reason: reason || 'n/a' }, version);
+}
+
+async function closeChange(id, version) {
+  const outcome = prompt('关闭结果说明');
+  if (!outcome) return;
+  await act(id, 'close', { outcome }, version);
+}
+
+async function revise(id, version) {
+  const change = state.changes.find(item => item.id === id);
+  const current = (change.data.affected_unit_ids || []).join(',');
+  const input = prompt('新的受影响装置ID列表（逗号分隔，增删即触发评审作废）\n当前：' + current, current);
+  if (input === null) return;
+  const ids = input.split(',').map(s => s.trim()).filter(Boolean);
+  const riskInput = prompt('风险等级（留空表示不变）：low / medium / high / critical', change.data.risk_level || '');
+  const data = { description: change.data.description, affected_unit_ids: ids };
+  if (riskInput && riskInput.trim()) data.risk_level = riskInput.trim();
+  await act(id, 'revise', data, version);
+}
+
+function renderActionItems() {
+  const host = document.getElementById('action-items');
+  if (!state.items.length) {
+    host.innerHTML = '<p class="muted">还没有行动项。</p>';
+    return;
+  }
+  host.innerHTML = state.items.map(item => {
+    const change = state.changes.find(c => c.id === item.data.change_id);
+    let buttons = '';
+    if (item.status === 'open') {
+      buttons = '<button class="primary" onclick="completeItem(\'' + item.id + '\',' + item.version + ')">完成</button>';
+    } else if (item.status === 'completed') {
+      buttons = '<button class="primary" onclick="verifyItem(\'' + item.id + '\',' + item.version + ')">核验</button>';
+    } else if (item.status === 'verified') {
+      buttons = '<button onclick="reopenItem(\'' + item.id + '\',' + item.version + ')">重开</button>';
+    }
+    return '<div class="card"><div class="card-head">' + badge(item.status)
+      + '<strong>' + esc(item.data.description || item.id) + '</strong>'
+      + '<span class="card-id">' + item.id + '</span>'
+      + '<span class="muted">所属变更：' + esc((change && (change.data.description || change.id)) || item.data.change_id) + '</span></div>'
+      + '<div class="muted">责任人：' + esc(item.data.owner || '') + '</div>'
+      + '<div class="actions">' + buttons + '</div></div>';
+  }).join('');
+}
+
+async function createActionItem() {
+  const changeId = document.getElementById('item-change').value;
+  const description = document.getElementById('item-description').value.trim();
+  const owner = document.getElementById('item-owner').value.trim();
+  if (!changeId || !description || !owner) { toast('字段不完整', false); return; }
+  try {
+    await api('POST', '/api/action_items', { change_id: changeId, description, owner });
+    document.getElementById('item-description').value = '';
+    document.getElementById('item-owner').value = '';
+    toggleEditor('new-item');
+    toast('行动项已登记', true);
+    await loadAll();
+  } catch (error) { toast('创建失败：' + error.message, false); }
+}
+
+async function completeItem(id, version) {
+  await act(id, 'complete', { completed_by: document.getElementById('userId').value, evidence: '现场记录' }, version);
+}
+
+async function verifyItem(id, version) {
+  await act(id, 'verify', { verifier: document.getElementById('userId').value }, version);
+}
+
+async function reopenItem(id, version) {
+  const reason = prompt('重开原因');
+  if (reason === null) return;
+  await act(id, 'reopen', { reason: reason || 'n/a' }, version);
+}
+
+function renderAudit() {
+  const host = document.getElementById('audit-body');
+  host.innerHTML = state.audit.slice().reverse().map(entry =>
+    '<tr><td>' + esc(entry.created_at) + '</td>'
+    + '<td class="card-id">' + esc(entry.entity_id) + '</td>'
+    + '<td><strong>' + esc(entry.action) + '</strong></td>'
+    + '<td>' + esc(entry.from_status || '') + ' → ' + esc(entry.to_status) + '</td>'
+    + '<td>' + esc(entry.actor_id) + ' (' + esc(entry.actor_role) + ')</td>'
+    + '<td><code>' + esc(JSON.stringify(entry.detail)) + '</code></td></tr>'
+  ).join('');
+}
+
+loadAll().catch(error => toast('加载失败：' + error.message, false));
 </script>
 </body>
 </html>
